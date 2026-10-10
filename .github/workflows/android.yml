@@ -46,7 +46,15 @@ jobs:
           KEYSTORE_SECRET: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_SECRET" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            # Les espaces et retours à la ligne ajoutés par un copier-coller sont ignorés.
+            KEYSTORE_SECRET=$(printf '%s' "$KEYSTORE_SECRET" | tr -d ' \r\n\t')
+            printf '%s' "$KEYSTORE_B64" | tr -d ' \r\n\t' | base64 -d > "$RUNNER_TEMP/release.jks" || {
+              echo "::error::KEYSTORE_B64 n'est pas un texte valide : recopie le fichier en entier."; exit 1; }
+            if [ "$(sha256sum "$RUNNER_TEMP/release.jks" | cut -d' ' -f1)" != "d7b3868716e468dea065e9ee20ed1801370297cba04c224666326a4d1225a282" ]; then
+              echo "::error::KEYSTORE_B64 est incomplet ou modifié : recopie le fichier en entier, sans rien ajouter ni enlever."; exit 1
+            fi
+            keytool -list -keystore "$RUNNER_TEMP/release.jks" -storepass "$KEYSTORE_SECRET" > /dev/null 2>&1 || {
+              echo "::error::KEYSTORE_PASSWORD ne correspond pas à la clé."; exit 1; }
             echo "KEYSTORE_PASSWORD=$KEYSTORE_SECRET" >> "$GITHUB_ENV"
             echo "SIGNATURE=stable" >> "$GITHUB_ENV"
           else
