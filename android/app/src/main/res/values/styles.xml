@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="nuit">#02193F</color>
+    <style name="AppTheme" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:statusBarColor">@color/nuit</item>
+        <item name="android:navigationBarColor">@color/nuit</item>
+        <item name="android:windowBackground">@color/nuit</item>
+    </style>
+</resources>

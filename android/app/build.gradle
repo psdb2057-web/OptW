@@ -1,0 +1,48 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Numéro de version = numéro d'exécution GitHub, pour que chaque mise à jour remplace la précédente.
+def runNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+def keystorePath = System.getenv('KEYSTORE_FILE')
+
+android {
+    namespace 'fr.psdb.majournee'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'fr.psdb.majournee'
+        minSdk 24
+        targetSdk 34
+        versionCode runNumber
+        versionName "1.0.${runNumber}"
+    }
+
+    signingConfigs {
+        release {
+            if (keystorePath) {
+                storeFile file(keystorePath)
+                storePassword System.getenv('KEYSTORE_PASSWORD')
+                keyAlias System.getenv('KEY_ALIAS')
+                keyPassword System.getenv('KEYSTORE_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig keystorePath ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}

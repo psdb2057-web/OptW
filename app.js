@@ -3,13 +3,15 @@
 /* ───────── Données ───────── */
 
 const KEY = 'ma-journee.v1';
-let state = { tasks: [], meetings: [] };
+const DEFAULT_SETTINGS = { calendars: null, lastSync: 0, asked: false };
+let state = { tasks: [], meetings: [], settings: { ...DEFAULT_SETTINGS } };
 
 function load() {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) state = Object.assign({ tasks: [], meetings: [] }, JSON.parse(raw));
   } catch (e) { /* stockage indisponible : on démarre à vide */ }
+  state.settings = Object.assign({}, DEFAULT_SETTINGS, state.settings);
 }
 
 function save() {
@@ -156,7 +158,7 @@ function meetingCard(m, opts = {}) {
   const s = toMin(m.start), e = toMin(m.end);
   const when = m.end ? `${fmtTime(m.start)} – ${fmtTime(m.end)} (${fmtDuration(e - s)})` : fmtTime(m.start);
   const rows = [
-    ['📍', m.place], ['👥', m.people], ['🎯', m.goal], ['📝', m.prep], ['💬', m.notes]
+    ['📍', m.place], ['👥', m.people], ['📄', m.desc && m.desc.length > 200 ? m.desc.slice(0, 200) + '…' : m.desc], ['🎯', m.goal], ['📝', m.prep], ['💬', m.notes]
   ].filter(([, v]) => v);
   let cls = 'card meeting';
   if (opts.isToday) {
@@ -166,7 +168,7 @@ function meetingCard(m, opts = {}) {
   }
   return el('div', { class: cls, onclick: () => openMeeting(m) },
     el('div', { class: 'when' }, when, opts.isToday && cls.includes(' now') ? ' · en cours' : ''),
-    el('div', { class: 'title' }, m.title),
+    el('div', { class: 'title' }, m.title, m.source === 'phone' ? ' 📲' : ''),
     rows.length ? el('dl', {}, rows.map(([k, v]) => [el('dt', {}, k), el('dd', {}, v)])) : null,
     opts.conflict ? el('div', { class: 'warn' }, '⚠️ Chevauche une autre réunion') : null
   );
@@ -296,11 +298,14 @@ function openMeeting(m) {
   editing = m || null;
   form.reset();
   $('#meeting-dialog-title').textContent = m ? 'Modifier la réunion' : 'Nouvelle réunion';
-  $('#btn-delete-meeting').hidden = !m;
+  const fromPhone = !!m && m.source === 'phone';
+  $('#btn-delete-meeting').hidden = !m || fromPhone;
+  $('#phone-meeting-hint').hidden = !fromPhone;
   const data = m || { date: todayISO() };
   for (const name of ['title', 'date', 'start', 'end', 'place', 'people', 'goal', 'prep', 'notes']) {
     form.elements[name].value = data[name] || '';
   }
+  for (const name of ['title', 'date', 'start', 'end', 'place', 'people']) form.elements[name].readOnly = fromPhone;
   dialog.showModal();
 }
 
@@ -470,7 +475,13 @@ $('#btn-speak').addEventListener('click', () => {
 
 /* ───────── Plus : sauvegarde et ménage ───────── */
 
+window.onFileSaved = (ok) => toast(ok ? 'Sauvegarde enregistrée.' : 'Sauvegarde annulée.');
+
 $('#btn-export').addEventListener('click', () => {
+  if (window.AndroidFiles) {
+    window.AndroidFiles.saveFile(`ma-journee-${todayISO()}.json`, 'application/json', JSON.stringify(state, null, 2));
+    return;
+  }
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
   const a = el('a', { href: URL.createObjectURL(blob), download: `ma-journee-${todayISO()}.json` });
   document.body.append(a);
@@ -487,7 +498,7 @@ $('#backup-input').addEventListener('change', async (e) => {
     const data = JSON.parse(await file.text());
     if (!Array.isArray(data.tasks) || !Array.isArray(data.meetings)) throw new Error('format');
     if (!confirm('Remplacer tes données actuelles par cette sauvegarde ?')) return;
-    state = { tasks: data.tasks, meetings: data.meetings };
+    state = { tasks: data.tasks, meetings: data.meetings, settings: Object.assign({}, DEFAULT_SETTINGS, data.settings) };
     save();
     rollOver();
     renderAll();
@@ -526,6 +537,116 @@ document.querySelectorAll('.tabs button').forEach((btn) => {
   });
 });
 
+/* ───────── Agenda du téléphone (uniquement dans l'appli Android) ───────── */
+
+const phone = window.AndroidCalendar || null; // pont fourni par l'appli native
+const SYNC_DAYS = 45;
+const SYNC_EVERY = 3 * 60 * 1000;
+let syncing = false;
+
+function phoneJSON(fn, ...args) {
+  try { return JSON.parse(phone[fn](...args)); } catch (e) { return null; }
+}
+
+function wantedCalendars(all) {
+  const chosen = state.settings.calendars;
+  return chosen ? chosen.map(String) : all.filter((c) => c.visible).map((c) => c.id);
+}
+
+function syncPhone(manual) {
+  if (!phone || syncing) return;
+  if (!phone.hasPermission()) {
+    if (manual) phone.requestPermission();
+    renderPhoneCard();
+    return;
+  }
+  syncing = true;
+  try {
+    const ids = wantedCalendars(phoneJSON('listCalendars') || []);
+    const t = todayISO();
+    const events = ids.length
+      ? phoneJSON('getEvents', String(fromISO(t).getTime()), String(fromISO(addDays(t, SYNC_DAYS)).getTime()), ids.join(','))
+      : [];
+    if (!Array.isArray(events)) { if (manual) toast('Lecture de l\'agenda impossible.'); return; }
+
+    const old = new Map(state.meetings.filter((m) => m.source === 'phone').map((m) => [m.key, m]));
+    const fresh = events.map((ev) => {
+      const b = new Date(ev.begin), e = new Date(ev.end), date = iso(b), prev = old.get(ev.key);
+      return {
+        id: prev ? prev.id : uid(), source: 'phone', key: ev.key,
+        title: ev.title || 'Sans titre', date,
+        start: `${pad(b.getHours())}:${pad(b.getMinutes())}`,
+        end: iso(e) === date ? `${pad(e.getHours())}:${pad(e.getMinutes())}` : '',
+        place: ev.place || '', people: ev.people || '', desc: ev.desc || '',
+        goal: prev ? prev.goal : '', prep: prev ? prev.prep : '', notes: prev ? prev.notes : ''
+      };
+    });
+    const freshKeys = new Set(fresh.map((m) => m.key));
+    // Les réunions saisies à la main restent ; celles de l'agenda sont remplacées par la version à jour.
+    state.meetings = state.meetings
+      .filter((m) => m.source !== 'phone' || (m.date < t && !freshKeys.has(m.key)))
+      .concat(fresh);
+    state.settings.lastSync = Date.now();
+    save();
+    renderAll();
+    if (manual) toast(`${plural(fresh.length, 'réunion synchronisée', 'réunions synchronisées')}.`);
+  } finally {
+    syncing = false;
+    renderPhoneCard();
+  }
+}
+
+function renderPhoneCard() {
+  if (!phone) return;
+  $('#phone-card').hidden = false;
+  $('#install-card').hidden = true;
+  const granted = phone.hasPermission();
+  const list = $('#phone-calendars');
+  list.replaceChildren();
+  $('#btn-phone-sync').textContent = granted ? 'Synchroniser maintenant' : 'Autoriser l\'accès à l\'agenda';
+  if (!granted) {
+    $('#phone-status').textContent = 'Autorise l\'accès à l\'agenda du téléphone pour que tes réunions apparaissent ici. Les données restent sur ton téléphone.';
+    return;
+  }
+  const last = state.settings.lastSync
+    ? `Dernière synchronisation à ${new Date(state.settings.lastSync).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}.`
+    : 'Pas encore synchronisé.';
+  $('#phone-status').textContent = `${last} Les ${SYNC_DAYS} prochains jours sont lus, les événements « toute la journée » sont ignorés.`;
+  const all = phoneJSON('listCalendars') || [];
+  const wanted = new Set(wantedCalendars(all));
+  for (const c of all) {
+    list.append(el('label', { class: 'check cal' },
+      el('input', {
+        type: 'checkbox', checked: wanted.has(c.id),
+        onchange: (e) => {
+          if (e.target.checked) wanted.add(c.id); else wanted.delete(c.id);
+          state.settings.calendars = [...wanted];
+          save();
+          syncPhone(false);
+        }
+      }),
+      el('span', {}, c.name, el('small', { class: 'muted' }, ` · ${c.account}`))
+    ));
+  }
+}
+
+window.onCalendarPermission = (ok) => {
+  if (ok) syncPhone(true); else { toast('Accès à l\'agenda refusé.'); renderPhoneCard(); }
+};
+
+function startPhoneSync() {
+  if (!phone) return;
+  $('#btn-phone-sync').addEventListener('click', () => syncPhone(true));
+  renderPhoneCard();
+  if (!phone.hasPermission() && !state.settings.asked) { // première ouverture : on demande l'accès une fois
+    state.settings.asked = true;
+    save();
+    phone.requestPermission();
+  } else {
+    syncPhone(false);
+  }
+}
+
 /* ───────── Installation et hors connexion ───────── */
 
 let installPrompt = null;
@@ -553,11 +674,13 @@ load();
 rollOver();
 limitTaskDates();
 renderAll();
+startPhoneSync();
 
 // Rafraîchit le briefing (réunion en cours, changement de jour) chaque minute et au retour dans l'appli.
 let lastDay = todayISO();
 function tick() {
   if (todayISO() !== lastDay) { lastDay = todayISO(); rollOver(); limitTaskDates(); }
+  if (phone && Date.now() - state.settings.lastSync > SYNC_EVERY) syncPhone(false);
   renderAll();
 }
 setInterval(tick, 60 * 1000);

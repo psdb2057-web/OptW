@@ -95,7 +95,13 @@
           <button id="btn-clean-tasks" class="btn ghost grow" type="button">Effacer les tâches terminées</button>
         </div>
       </div>
-      <div class="card">
+      <div class="card" id="phone-card" hidden>
+        <h3>📲 Agenda du téléphone</h3>
+        <p class="muted" id="phone-status"></p>
+        <div id="phone-calendars"></div>
+        <button id="btn-phone-sync" class="btn" type="button">Synchroniser maintenant</button>
+      </div>
+      <div class="card" id="install-card">
         <h3>📲 Installer sur Android</h3>
         <p class="muted">Dans Chrome, ouvre le menu ⋮ puis « Ajouter à l'écran d'accueil » ou « Installer l'application ».</p>
         <button id="btn-install" class="btn" type="button" hidden>Installer maintenant</button>
@@ -114,6 +120,7 @@
   <dialog id="meeting-dialog">
     <form id="meeting-form" method="dialog">
       <h3 id="meeting-dialog-title">Nouvelle réunion</h3>
+      <p id="phone-meeting-hint" class="muted" hidden>📲 Réunion synchronisée depuis l'agenda du téléphone : pour changer l'horaire ou le titre, modifie-la dans ton agenda. Objectif, préparation et notes sont à toi.</p>
       <label>Intitulé
         <input name="title" type="text" required>
       </label>
