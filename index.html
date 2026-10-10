@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#02193F">
+  <meta name="description" content="Mes tâches du jour et le briefing de mes réunions.">
+  <title>Ma journée</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <h1>Ma journée</h1>
+    <p id="today-label"></p>
+  </header>
+
+  <main>
+    <!-- ───── Aujourd'hui ───── -->
+    <section id="view-today" class="view active" aria-label="Aujourd'hui">
+      <div class="card hero">
+        <p id="greeting" class="greeting"></p>
+        <p id="summary"></p>
+        <button id="btn-speak" class="btn ghost" type="button">🔊 Écouter le briefing</button>
+      </div>
+
+      <h2>📅 Réunions du jour</h2>
+      <div id="today-meetings"></div>
+      <div id="free-slots"></div>
+
+      <h2>✅ À faire aujourd'hui</h2>
+      <form id="quick-task" class="row">
+        <input id="quick-task-text" type="text" placeholder="Ajouter une tâche…" autocomplete="off" required>
+        <button class="btn" type="submit" aria-label="Ajouter">＋</button>
+      </form>
+      <ul id="today-tasks" class="list"></ul>
+
+      <h2>🌙 Demain</h2>
+      <div id="tomorrow" class="card muted"></div>
+    </section>
+
+    <!-- ───── Tâches ───── -->
+    <section id="view-tasks" class="view" aria-label="Tâches">
+      <form id="task-form" class="card">
+        <label>Tâche
+          <input id="task-text" type="text" placeholder="Ex. : appeler l'école" autocomplete="off" required>
+        </label>
+        <div class="row">
+          <label class="grow">Date
+            <input id="task-date" type="date" required>
+          </label>
+          <label class="check">
+            <input id="task-prio" type="checkbox"> ⭐ Prioritaire
+          </label>
+        </div>
+        <button class="btn" type="submit">Ajouter la tâche</button>
+      </form>
+      <div id="task-groups"></div>
+    </section>
+
+    <!-- ───── Réunions ───── -->
+    <section id="view-meetings" class="view" aria-label="Réunions">
+      <div class="row">
+        <button id="btn-new-meeting" class="btn grow" type="button">＋ Nouvelle réunion</button>
+        <label class="btn ghost file">📥 Importer .ics
+          <input id="ics-input" type="file" accept=".ics,text/calendar" hidden>
+        </label>
+      </div>
+      <div id="meeting-groups"></div>
+    </section>
+
+    <!-- ───── Plus ───── -->
+    <section id="view-more" class="view" aria-label="Plus">
+      <div class="card">
+        <h3>💾 Sauvegarde</h3>
+        <p class="muted">Tes données restent sur ce téléphone. Exporte-les de temps en temps pour ne rien perdre.</p>
+        <div class="row">
+          <button id="btn-export" class="btn grow" type="button">Exporter</button>
+          <label class="btn ghost grow file">Restaurer
+            <input id="backup-input" type="file" accept="application/json,.json" hidden>
+          </label>
+        </div>
+      </div>
+      <div class="card">
+        <h3>🧹 Ménage</h3>
+        <div class="row">
+          <button id="btn-clean-meetings" class="btn ghost grow" type="button">Effacer les réunions passées</button>
+          <button id="btn-clean-tasks" class="btn ghost grow" type="button">Effacer les tâches terminées</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>📲 Installer sur Android</h3>
+        <p class="muted">Dans Chrome, ouvre le menu ⋮ puis « Ajouter à l'écran d'accueil » ou « Installer l'application ».</p>
+        <button id="btn-install" class="btn" type="button" hidden>Installer maintenant</button>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabs" aria-label="Navigation">
+    <button data-view="today" class="active" type="button"><span>☀️</span>Aujourd'hui</button>
+    <button data-view="tasks" type="button"><span>✅</span>Tâches</button>
+    <button data-view="meetings" type="button"><span>📅</span>Réunions</button>
+    <button data-view="more" type="button"><span>⚙️</span>Plus</button>
+  </nav>
+
+  <!-- Fiche réunion -->
+  <dialog id="meeting-dialog">
+    <form id="meeting-form" method="dialog">
+      <h3 id="meeting-dialog-title">Nouvelle réunion</h3>
+      <label>Intitulé
+        <input name="title" type="text" required>
+      </label>
+      <div class="row">
+        <label class="grow">Date <input name="date" type="date" required></label>
+      </div>
+      <div class="row">
+        <label class="grow">Début <input name="start" type="time" required></label>
+        <label class="grow">Fin <input name="end" type="time"></label>
+      </div>
+      <label>Lieu ou lien visio
+        <input name="place" type="text">
+      </label>
+      <label>Participants
+        <input name="people" type="text" placeholder="Séparés par des virgules">
+      </label>
+      <label>Objectif
+        <textarea name="goal" rows="2" placeholder="Ce que je veux obtenir de cette réunion"></textarea>
+      </label>
+      <label>À préparer
+        <textarea name="prep" rows="2" placeholder="Documents, questions, chiffres…"></textarea>
+      </label>
+      <label>Notes
+        <textarea name="notes" rows="3"></textarea>
+      </label>
+      <div class="row">
+        <button id="btn-delete-meeting" class="btn danger" type="button">Supprimer</button>
+        <span class="grow"></span>
+        <button value="cancel" class="btn ghost" type="button" id="btn-cancel-meeting">Annuler</button>
+        <button value="save" class="btn" type="submit">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
