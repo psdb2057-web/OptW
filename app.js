@@ -417,10 +417,22 @@ $('#ics-input').addEventListener('change', async (e) => {
 
 /* ───────── Tâches : saisie ───────── */
 
+/* Une tâche ne se planifie jamais dans le passé : on borne les champs date à aujourd'hui. */
+function limitTaskDates() {
+  const t = todayISO();
+  for (const input of [$('#task-date'), $('#quick-task-date')]) {
+    input.min = t;
+    if (!input.value || input.value < t) input.value = t;
+  }
+}
+
 function addTask(text, date, prio) {
+  if (!date || date < todayISO()) { toast('Choisis aujourd\'hui ou une date à venir.'); return false; }
   state.tasks.push({ id: uid(), text, date, prio, done: false, created: Date.now() });
   save();
   renderAll();
+  if (date > todayISO()) toast(`Tâche ajoutée pour ${longDate(date)}.`);
+  return true;
 }
 
 $('#quick-task').addEventListener('submit', (e) => {
@@ -428,18 +440,20 @@ $('#quick-task').addEventListener('submit', (e) => {
   const input = $('#quick-task-text');
   const text = input.value.trim();
   if (!text) return;
-  addTask(text, todayISO(), false);
+  if (!addTask(text, $('#quick-task-date').value, false)) return;
   input.value = '';
+  $('#quick-task-date').value = todayISO(); // retour à « aujourd'hui » pour la tâche suivante
 });
 
 $('#task-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const text = $('#task-text').value.trim();
   if (!text) return;
-  addTask(text, $('#task-date').value || todayISO(), $('#task-prio').checked);
+  const date = $('#task-date').value;
+  if (!addTask(text, date, $('#task-prio').checked)) return;
   $('#task-text').value = '';
   $('#task-prio').checked = false;
-  toast('Tâche ajoutée.');
+  if (date <= todayISO()) toast('Tâche ajoutée.');
 });
 
 /* ───────── Briefing vocal ───────── */
@@ -537,13 +551,13 @@ if (navigator.storage && navigator.storage.persist) navigator.storage.persist().
 
 load();
 rollOver();
-$('#task-date').value = todayISO();
+limitTaskDates();
 renderAll();
 
 // Rafraîchit le briefing (réunion en cours, changement de jour) chaque minute et au retour dans l'appli.
 let lastDay = todayISO();
 function tick() {
-  if (todayISO() !== lastDay) { lastDay = todayISO(); rollOver(); $('#task-date').value = lastDay; }
+  if (todayISO() !== lastDay) { lastDay = todayISO(); rollOver(); limitTaskDates(); }
   renderAll();
 }
 setInterval(tick, 60 * 1000);

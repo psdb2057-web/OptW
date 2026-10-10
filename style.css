@@ -80,8 +80,11 @@ input[type=text], input[type=date], input[type=time], textarea {
   padding: 10px 12px;
 }
 input:focus, textarea:focus { outline: 2px solid var(--ocre); border-color: transparent; }
-#quick-task { flex-wrap: nowrap; margin-bottom: 8px; }
+#quick-task { margin-bottom: 8px; }
 #quick-task input { margin: 0; }
+.row.nowrap { flex-wrap: nowrap; align-items: center; }
+.when-line { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: .95rem; }
+.when-line input { width: auto; flex: 1; max-width: 220px; }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center;

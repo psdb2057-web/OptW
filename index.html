@@ -31,9 +31,14 @@
       <div id="free-slots"></div>
 
       <h2>✅ À faire aujourd'hui</h2>
-      <form id="quick-task" class="row">
-        <input id="quick-task-text" type="text" placeholder="Ajouter une tâche…" autocomplete="off" required>
-        <button class="btn" type="submit" aria-label="Ajouter">＋</button>
+      <form id="quick-task">
+        <div class="row nowrap">
+          <input id="quick-task-text" type="text" placeholder="Ajouter une tâche…" autocomplete="off" required>
+          <button class="btn" type="submit" aria-label="Ajouter">＋</button>
+        </div>
+        <label class="when-line">📅 Pour le
+          <input id="quick-task-date" type="date" required>
+        </label>
       </form>
       <ul id="today-tasks" class="list"></ul>
 
